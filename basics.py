@@ -1,11 +1,9 @@
-from enum import Enum, IntEnum
-from itertools import product
+from enum import Enum, IntEnum, unique
 from typing import *
 
 Square = int  # 0 .. 64
 Queen = Square
 Pawns = List[Square]  # ordered
-Position = Tuple[Pawns, Queen]
 BoolBoard = List[bool]  # index is Square, value is bool
 IntBoard = List[int]  # index is Square, value is int
 StrBoard = List[str]  # index is Square, value is str
@@ -20,7 +18,8 @@ INVALID_RANK = 0
 RANKS_PLUS_INVALID_RANK = [INVALID_RANK] + RANKS
 RANK_NAME = "x" + "12345678"
 
-SQUARES_AS_PAIRS = list(product(FILES, RANKS))
+SQUARES_AS_PAIRS = [(f, r) for r in reversed(RANKS) for f in FILES]
+# so we start with a8, b8, ..., h8, then a7, b7, ..., h7, etc.
 assert len(SQUARES_AS_PAIRS) == 8 * 8
 
 SQUARES = list(range(1, 65))
@@ -29,9 +28,9 @@ SQUARES_PLUS_INVALID_SQUARE = [INVALID_SQUARE] + SQUARES
 SQUARE_NAME = ([FILE_NAME[INVALID_FILE] + RANK_NAME[INVALID_RANK]] +
                [FILE_NAME[pair[0]] + RANK_NAME[pair[1]] for pair in SQUARES_AS_PAIRS])
 
-assert SQUARE_NAME[1] == "a1"
-assert SQUARE_NAME[2] == "a2"
-assert SQUARE_NAME[64] == "h8"
+assert SQUARE_NAME[1] == "a8"
+assert SQUARE_NAME[2] == "b8"
+assert SQUARE_NAME[64] == "h1"
 assert SQUARE_NAME[INVALID_SQUARE] == "xx"
 
 SQUARE_TO_FILE = [INVALID_FILE] + [pair[0] for pair in SQUARES_AS_PAIRS]
@@ -41,6 +40,8 @@ FILE_RANK_TO_SQUARE = [[next((sq for sq in SQUARES_PLUS_INVALID_SQUARE
                              INVALID_SQUARE)
                         for r in RANKS_PLUS_INVALID_RANK]
                        for f in FILES_PLUS_INVALID_FILE]
+
+# for example FILE_RANK_TO_SQUARE[1][1] is a1, FILE_RANK_TO_SQUARE[1][2] is a2, etc.
 
 
 def test_mappings():
@@ -61,7 +62,7 @@ assert SQUARE_NAME[FILE_RANK_TO_SQUARE[1][2]] == "a2"
 assert SQUARE_NAME[FILE_RANK_TO_SQUARE[8][8]] == "h8"
 assert FILE_RANK_TO_SQUARE[INVALID_FILE][3] == FILE_RANK_TO_SQUARE[4][INVALID_RANK] == INVALID_SQUARE
 
-PAWN_SQUARES: List[Square] = [sq for sq in SQUARES if SQUARE_TO_RANK[sq] > 1]
+PAWN_SQUARES: List[Square] = [sq for sq in SQUARES if 1 < SQUARE_TO_RANK[sq]]
 IS_PROMOTION_SQUARE: BoolBoard = [SQUARE_TO_RANK[sq] == 8 for sq in SQUARES_PLUS_INVALID_SQUARE]
 
 
@@ -77,13 +78,8 @@ def squares(s: str) -> List[Square]:
     return sorted(result)
 
 
-def create_position(s: str) -> Position:
-    pawns, queen = s.split("Q")
-    return squares(pawns), str_to_square(queen)
-
-
-assert str_to_square("b2") == 10
-assert squares("b2g2a8") == [8, 10, 50]
+assert str_to_square("b2") == 50, str_to_square("b2")
+assert squares("b2g2a8") == [1, 50, 55], squares("b2g2a8")
 assert squares("") == []
 
 
@@ -100,6 +96,7 @@ def print_board(name: str, values: List[any]) -> None:
     print("    " + " ".join([FILE_NAME[file] * cell_width for file in FILES]))
 
 
+@unique
 class Direction(IntEnum):
     N = 0
     NE = 1
@@ -111,6 +108,7 @@ class Direction(IntEnum):
     NW = 7
 
 
+@unique
 class DirectionVector(Enum):
     N = (0, 1)
     NE = (1, 1)
@@ -123,6 +121,7 @@ class DirectionVector(Enum):
 
 
 def create_next_square() -> List[List[Square]]:
+    # sets result[sq][d] to the square next to sq in direction d
     result = [[INVALID_SQUARE for _ in Direction] for _ in SQUARES_PLUS_INVALID_SQUARE]
     for d in Direction:
         result[INVALID_SQUARE][d] = INVALID_SQUARE
@@ -130,9 +129,9 @@ def create_next_square() -> List[List[Square]]:
         for sq in SQUARES:
             f = SQUARE_TO_FILE[sq] + df
             r = SQUARE_TO_RANK[sq] + dr
-            result[sq][d] = FILE_RANK_TO_SQUARE[f][r] if \
-                f in FILES_PLUS_INVALID_FILE and r in RANKS_PLUS_INVALID_RANK \
-                else INVALID_SQUARE
+            result[sq][d] = (FILE_RANK_TO_SQUARE[f][r]
+                             if f in FILES_PLUS_INVALID_FILE and r in RANKS_PLUS_INVALID_RANK
+                             else INVALID_SQUARE)
     return result
 
 
@@ -145,105 +144,7 @@ NEXT_SQUARE = create_next_square()
 assert NEXT_SQUARE[str_to_square("d4")][Direction.NE] == str_to_square("e5")
 
 
-def initial_position() -> Position:
-    return create_position("a2b2c2d2e2f2g2h2Qd8")
-
-
-def __is_valid__(p: Position) -> bool:
-    pawns, queen = p
-    if any(SQUARE_TO_RANK[pawn] == 1 for pawn in pawns):
-        return False
-    if queen in pawns:
-        return False
-    return True
-
-
-def is_valid_pawns_to_play(p: Position) -> bool:
-    if not __is_valid__(p):
-        return False
-    pawns, queen = p
-    if any(IS_PROMOTION_SQUARE[pawn] for pawn in pawns):
-        return False
-    if NEXT_SQUARE[queen][Direction.SW] in pawns:
-        return False
-    if NEXT_SQUARE[queen][Direction.SE] in pawns:
-        return False
-    return True
-
-
-def is_valid_queen_to_play(p: Position) -> bool:
-    if not __is_valid__(p):
-        return False
-    pawns, queen = p
-    if len([pawn for pawn in pawns if IS_PROMOTION_SQUARE[pawn]]) > 1:
-        return False
-    return True
-
-
-def pawns_have_won(p: Union[Pawns, Position]) -> bool:
-    pawns = p[0] if isinstance(p, Tuple) else p
-    return any([IS_PROMOTION_SQUARE[pawn] for pawn in pawns])
-
-
-def pawns_have_lost(p: Union[Pawns, Position]) -> bool:
-    pawns = p[0] if isinstance(p, Tuple) else p
-    return pawns == []
-
-
-assert not pawns_have_won([])
-assert pawns_have_lost([])
-assert pawns_have_won([str_to_square("a8")])
-assert pawns_have_won(squares("a8"))
-assert pawns_have_won(squares("a2g8h6"))
-assert not pawns_have_won(squares("a2g6h6"))
-
-
-def get_position_after_queen_play(position: Position, new_queen) -> Position:
-    pawns, queen = position
-    new_pawns = pawns.copy()
-    if new_queen in new_pawns:
-        new_pawns.remove(new_queen)
-    return new_pawns, new_queen
-
-
-def get_position_after_pawn_play(position: Position, new_pawn) -> Position:
-    pawns, queen = position
-    new_pawns = pawns.copy()
-    for i, pawn in enumerate(new_pawns):
-        if SQUARE_TO_FILE[pawn] == SQUARE_TO_FILE[new_pawn]:
-            new_pawns[i] = new_pawn
-            return new_pawns, queen
-
-    assert False, f"Moving pawn not found: {new_pawn}, {pawns}"
-
-
-def get_str_board(position: Position) -> StrBoard:
-    result = ["." for _ in SQUARES_PLUS_INVALID_SQUARE]
-    pawns, queen = position
-    result[queen] = "q"
-    for pawn in pawns:
-        result[pawn] = "o"
-    return result
-
-
-def get_bool_board_occupied(position: Position) -> BoolBoard:
-    pawns, queen = position
-    result = [False for _ in SQUARES_PLUS_INVALID_SQUARE]
-    result[queen] = True
-    for pawn in pawns:
-        result[pawn] = True
-    return result
-
-
-def get_bool_board_attacked_by_pawns(pawns: Pawns) -> BoolBoard:
-    board = [False for _ in SQUARES_PLUS_INVALID_SQUARE]
-    for pawn in pawns:
-        for d in [Direction.NW, Direction.NE]:
-            board[NEXT_SQUARE[pawn][d]] = True
-    return board
-
-
-def get_bool_board_attacked_by_queen(queen: Queen) -> BoolBoard:
+def get_bool_board_attacked_by_queen(queen) -> BoolBoard:
     # note queen might jump over pawns in this method
     board = [False for _ in SQUARES_PLUS_INVALID_SQUARE]
     for d in Direction:
@@ -254,32 +155,102 @@ def get_bool_board_attacked_by_queen(queen: Queen) -> BoolBoard:
     return board
 
 
-def get_pawn_destinations(position: Position):
-    pawns, queen = position
-    for pawn in pawns:
-        result = NEXT_SQUARE[pawn][Direction.N]
-        if result in (INVALID_SQUARE, queen):
-            continue
-        yield result
-        if SQUARE_TO_RANK[pawn] == 2:
-            result = NEXT_SQUARE[result][Direction.N]
-            if result == queen:
+class Position:
+    def __init__(self, *args):
+        # either a string like "b2g2a8Qd4" or a list of pawns and a queen
+        if len(args) == 2:
+            self.pawns, self.queen = args
+        else:
+            pawns, queen = args[0].split("Q")
+            self.pawns = squares(pawns)
+            self.queen = str_to_square(queen)
+
+    def __str__(self):
+        return "".join([SQUARE_NAME[pawn] for pawn in self.pawns]) + "Q" + SQUARE_NAME[self.queen]
+
+    def __is_valid(self) -> bool:
+        # JWA: why is a position without a pawn valid but a position without a queen not?
+        if any(SQUARE_TO_RANK[pawn] in (1, 8) for pawn in self.pawns):
+            return False
+        if self.queen in self.pawns:
+            return False
+        return True
+
+    def is_valid_queen_to_play(self) -> bool:
+        return self.__is_valid()
+
+    def is_valid_pawns_to_play(self) -> bool:
+        if not self.__is_valid():
+            return False
+        if NEXT_SQUARE[self.queen][Direction.SW] in self.pawns:
+            return False
+        if NEXT_SQUARE[self.queen][Direction.SE] in self.pawns:
+            return False
+        return True
+
+    def get_position_after_queen_play(self, new_queen_square):
+        new_pawns = self.pawns.copy()
+        if new_queen_square in new_pawns:
+            new_pawns.remove(new_queen_square)
+        return Position(new_pawns, new_queen_square)
+
+    def get_position_after_pawn_play(self, new_pawn_square):
+        new_pawns = self.pawns.copy()
+        for i, pawn in enumerate(new_pawns):
+            if SQUARE_TO_FILE[pawn] == SQUARE_TO_FILE[new_pawn_square]:
+                new_pawns[i] = new_pawn_square
+                return Position(new_pawns, self.queen)
+
+        assert False, f"Moving pawn not found: {new_pawn_square}, {self.pawns}"
+
+    def get_str_board(self) -> StrBoard:
+        result = ["." for _ in SQUARES_PLUS_INVALID_SQUARE]
+        result[self.queen] = "q"
+        for pawn in self.pawns:
+            result[pawn] = "o"
+        return result
+
+    def get_bool_board_occupied(self) -> BoolBoard:
+        result = [False for _ in SQUARES_PLUS_INVALID_SQUARE]
+        result[self.queen] = True
+        for pawn in self.pawns:
+            result[pawn] = True
+        return result
+
+    def get_bool_board_attacked_by_pawns(self) -> BoolBoard:
+        board = [False for _ in SQUARES_PLUS_INVALID_SQUARE]
+        for pawn in self.pawns:
+            for d in [Direction.NW, Direction.NE]:
+                board[NEXT_SQUARE[pawn][d]] = True
+        return board
+
+    def get_pawn_destinations(self):
+        for pawn in self.pawns:
+            result = NEXT_SQUARE[pawn][Direction.N]
+            if result in (INVALID_SQUARE, self.queen):
                 continue
             yield result
+            if SQUARE_TO_RANK[pawn] == 2:
+                result = NEXT_SQUARE[result][Direction.N]
+                if result == self.queen:
+                    continue
+                yield result
+
+    def get_queen_destinations(self):
+        occupied_squares = self.get_bool_board_occupied()
+        attacked_squares = self.get_bool_board_attacked_by_pawns()
+        for d in Direction:
+            square = NEXT_SQUARE[self.queen][d]
+            while square != INVALID_SQUARE:
+                if not attacked_squares[square]:
+                    yield square
+                if occupied_squares[square]:
+                    break
+                square = NEXT_SQUARE[square][d]
 
 
-def get_queen_destinations(position: Position):
-    pawns, queen = position
-    occupied_squares = get_bool_board_occupied(position)
-    attacked_squares = get_bool_board_attacked_by_pawns(pawns)
-    for d in Direction:
-        square = NEXT_SQUARE[queen][d]
-        while square != INVALID_SQUARE:
-            if not attacked_squares[square]:
-                yield square
-            if occupied_squares[square]:
-                break
-            square = NEXT_SQUARE[square][d]
+def initial_position() -> Position:
+    return Position("a2b2c2d2e2f2g2h2Qd8")
 
 
 if __name__ == "__main__":

@@ -55,9 +55,11 @@ def get_eval_queen_to_play(position, deep):
 
 
 def queen_can_win(position):
-    result = evaluation_store[position, "BLACK"]
+    result = dict_queen_can_win[position]
     if result is not None:
-        return result == Status.WIN
+        return result
+    # not found in dict, so we have to calculate it
+    result = False  # unless we find a winning move
 
     assert len(position.pawns) > 0, f"position without pawns is not valid when queen to play: {position}"
     assert position.is_valid_queen_to_play()
@@ -68,85 +70,67 @@ def queen_can_win(position):
     for new_queen_square in list_queen_destinations:
         new_position = position.get_position_after_queen_play(new_queen_square)
         if not pawns_can_win(new_position):
-            evaluation_store.save(position, "BLACK", Status.WIN)
-            return True
+            result = True
+            break
 
-    evaluation_store.save(position, "BLACK", Status.LOSE)
-    return False
+    dict_queen_can_win.save(position, result)
+    return result
 
 
 def pawns_can_win(position):
-    result = evaluation_store[(position, "WHITE")]
+    result = dict_pawns_can_win[position]
     if result is not None:
-        return result == Status.WIN
+        return result
+    # not found in dict, so we have to calculate it
+    result = False  # unless we find a winning move
 
     list_of_pawn_destinations = get_ordered_square_list_pawn_destinations_best_first(position) \
         if USE_ORDERED_LISTS else position.get_pawn_destinations()
 
     for new_pawn_square in list_of_pawn_destinations:
         if IS_PROMOTION_SQUARE[new_pawn_square]:
-            evaluation_store.save(position, "WHITE", Status.WIN)
-            return True
-
+            result = True
+            break
         new_position = position.get_position_after_pawn_play(new_pawn_square)
         if not queen_can_win(new_position):
-            evaluation_store.save(position, "WHITE", Status.WIN)
-            return True
+            result = True
+            break
 
-    evaluation_store.save(position, "WHITE", Status.LOSE)
-    return False
-
-
-class Status(IntEnum):
-    WIN = 1
-    DRAW = 0
-    LOSE = -1
-
-    def __str__(self):
-        return {Status.WIN: "+", Status.DRAW: '=', Status.LOSE: "-"}[self]
+    dict_pawns_can_win.save(position, result)
+    return result
 
 
 class EvaluationStore:
     def __init__(self):
-        self.store = {"WHITE": [{} for _ in range(9)],
-                      "BLACK": [{} for _ in range(9)]}
-        # i.e. store[p][n] contains positions with n pawns and p to play
-        self.read_count = {"WHITE": 0, "BLACK": 0}
-        self.write_count = {"WHITE": 0, "BLACK": 0}
+        self.store = [{} for _ in range(9)]
+        # i.e. store[n] contains positions with n pawns
+        self.read_count = 0
+        self.write_count = 0
 
-    def save(self, position, player, evaluation):
-        assert isinstance(evaluation, Status)
+    def save(self, position, evaluation):
+        assert isinstance(evaluation, bool)
         n = len(position.pawns)
         code = self.position_to_code(position)
-        assert code not in self.store[player][n], f"position already in store: {position}"
-        self.store[player][n][code] = evaluation
-        self.write_count[player] += 1
+        assert code not in self.store[n], f"position already in store: {position}"
+        self.store[n][code] = evaluation
+        self.write_count += 1
 
-    def __getitem__(self, index):
-        position, player = index
+    def __getitem__(self, position):
         n = len(position.pawns)
         code = self.position_to_code(position)
-        self.read_count[player] += 1
-        return self.store[player][n].get(code, None)
+        self.read_count += 1
+        return self.store[n].get(code, None)
 
     def print_stats(self):
-        for p in ("WHITE", "BLACK"):
-            print(f"Player: {p}")
-            print(f"  Number of valid position: {sum([len(x) for x in self.store[p]])}")
-            for n in range(9):
-                if len(self.store[p][n]) > 0:
-                    print(f"    Number of valid positions with {n} pawns: {len(self.store[p][n])}", end=" (")
-                    print(f"W={list(self.store[p][n].values()).count(Status.WIN)}", end=" ")
-                    print(f"D={list(self.store[p][n].values()).count(Status.DRAW)}", end=" ")
-                    print(f"L={list(self.store[p][n].values()).count(Status.LOSE)})")
-
-        for code in self.store["BLACK"][2]:
-            if self.store["BLACK"][2][code] == Status.DRAW:
-                print(code)
+        print(f"  Number of valid position: {sum([len(x) for x in self.store])}")
+        for n in range(9):
+            if len(self.store[n]) > 0:
+                print(f"    Number of valid positions with {n} pawns: {len(self.store[n])}", end=" (")
+                print(f"W={list(self.store[n].values()).count(True)}", end=" ")
+                print(f"L={list(self.store[n].values()).count(False)})")
 
     def print_counts(self):
-        print(f"Reads: {self.read_count}", end="\t")
-        print(f"Writes: {self.write_count}")
+        print(f"Reads: {self.read_count}\tWrites: {self.write_count}")
 
     @staticmethod
     def position_to_code(position):
@@ -156,7 +140,7 @@ class EvaluationStore:
 def generate_and_evaluate_all_positions_without_pawns():
     for queen in SQUARES:
         assert not pawns_can_win(Position([], queen))
-        # without pawns, the latest move was a capture by the queen so white needs to play, so
+        # without pawns, the latest move was a capture by the queen so pawns needs to play, so
         # assert queen_can_win(([], queen)) is not valid
 
 
@@ -196,55 +180,60 @@ def generate_and_evaluate_all_positions_with_three_pawns():
                                 queen_can_win(p)
 
 
+def print_stats():
+    dict_pawns_can_win.print_stats()
+    dict_queen_can_win.print_stats()
+    dict_pawns_can_win.print_counts()
+    dict_queen_can_win.print_counts()
+
+
 def generate_and_evaluate():
     generate_and_evaluate_all_positions_without_pawns()
-    evaluation_store.print_counts()
-    evaluation_store.print_stats()
-    assert len(evaluation_store.store["WHITE"][0]) == 64, len(evaluation_store.store["WHITE"][0])
+    print_stats()
+    assert len(dict_pawns_can_win.store[0]) == 64, len(dict_pawns_can_win.store[0])
     generate_and_evaluate_all_positions_with_one_pawn()
-    evaluation_store.print_counts()
-    evaluation_store.print_stats()
-    # white to play:
+    print_stats()
+    # pawns to play:
     #  6 + 6 rook pawns each with 62 queen positions
     #  6 * 6 other pawns each with 61 queen positions
     # so 2 * 6 * 62 + 6 * 6 * 61
-    print(len(evaluation_store.store["WHITE"][1]))
-    print(2 * 6 * 62 + 6 * 6 * 61)
-    assert len(evaluation_store.store["WHITE"][1]) == 2 * 6 * 62 + 6 * 6 * 61
-    # black to play:
+    assert len(dict_pawns_can_win.store[1]) == 2 * 6 * 62 + 6 * 6 * 61
+    # queen to play:
     #  8 * 6 pawn positions and 63 queen position
     # no pawns: 64
-    print(len(evaluation_store.store["BLACK"][1]))
-    print(8 * 6 * 63)
-    assert len(evaluation_store.store["BLACK"][1]) == 8 * 6 * 63
-    evaluation_store.print_stats()
+    assert len(dict_queen_can_win.store[1]) == 8 * 6 * 63
+    print_stats()
     generate_and_evaluate_all_positions_with_two_pawns()
-    evaluation_store.print_stats()
+    print_stats()
     # generate_and_evaluate_all_positions_with_three_pawns()
     # evaluation_store.print_stats()
-    evaluation_store.print_counts()
 
 
 def unit_test():
     p = Position("Qd5")
     assert not pawns_can_win(p)
-    evaluation_store.print_counts()
+    dict_pawns_can_win.print_counts()
+    dict_queen_can_win.print_counts()
 
     p = Position("b8Qb3")
     assert not p.is_valid_queen_to_play()
-    evaluation_store.print_counts()
+    dict_pawns_can_win.print_counts()
+    dict_queen_can_win.print_counts()
 
     p = Position("b7Qd8")
     assert pawns_can_win(p)
-    evaluation_store.print_counts()
+    dict_pawns_can_win.print_counts()
+    dict_queen_can_win.print_counts()
 
     p = Position("b7Qb8")
     assert not pawns_can_win(p)  # Draw
-    evaluation_store.print_counts()
+    dict_pawns_can_win.print_counts()
+    dict_queen_can_win.print_counts()
 
     p = Position("b6Qb8")
     assert queen_can_win(p)
-    evaluation_store.print_counts()
+    dict_pawns_can_win.print_counts()
+    dict_queen_can_win.print_counts()
 
 
 def main():
@@ -264,7 +253,8 @@ def main():
 
 
 start = timer()
-evaluation_store = EvaluationStore()
+dict_pawns_can_win = EvaluationStore()
+dict_queen_can_win = EvaluationStore()
 # unit_test()
 generate_and_evaluate()
 end = timer()

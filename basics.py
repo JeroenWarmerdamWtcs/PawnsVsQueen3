@@ -3,7 +3,7 @@ from typing import *
 
 Square = int  # 0 .. 64
 Queen = Square
-Pawns = List[Square]  # ordered
+Pawns = List[Square]
 BoolBoard = List[bool]  # index is Square, value is bool
 IntBoard = List[int]  # index is Square, value is int
 StrBoard = List[str]  # index is Square, value is str
@@ -14,6 +14,7 @@ FILES_PLUS_INVALID_FILE = [INVALID_FILE] + FILES
 FILE_NAME = "x" + "abcdefgh"
 
 RANKS = list(range(1, 9))
+PAWN_RANKS = list(range(2, 8))  # pawn moves might return a destination on rank 8, but that move is never played
 INVALID_RANK = 0
 RANKS_PLUS_INVALID_RANK = [INVALID_RANK] + RANKS
 RANK_NAME = "x" + "12345678"
@@ -70,7 +71,7 @@ def str_to_square(s: str) -> Square:
     return next((sq for sq in SQUARES_PLUS_INVALID_SQUARE if SQUARE_NAME[sq] == s), INVALID_SQUARE)
 
 
-def squares(s: str) -> List[Square]:
+def str_to_squares(s: str) -> List[Square]:
     result = []
     while s != "":
         result.append(str_to_square(s[:2]))
@@ -79,8 +80,8 @@ def squares(s: str) -> List[Square]:
 
 
 assert str_to_square("b2") == 50, str_to_square("b2")
-assert squares("b2g2a8") == [1, 50, 55], squares("b2g2a8")
-assert squares("") == []
+assert str_to_squares("b2g2a8") == [1, 50, 55], str_to_squares("b2g2a8")
+assert str_to_squares("") == []
 
 
 def print_board(name: str, values: List[any]) -> None:
@@ -162,11 +163,14 @@ class Position:
             self.pawns, self.queen = args
         else:
             pawns, queen = args[0].split("Q")
-            self.pawns = squares(pawns)
+            self.pawns = str_to_squares(pawns)
             self.queen = str_to_square(queen)
 
     def __str__(self):
         return "".join([SQUARE_NAME[pawn] for pawn in self.pawns]) + "Q" + SQUARE_NAME[self.queen]
+
+    def copy(self):
+        return Position(self.pawns.copy(), self.queen)
 
     def __is_valid(self) -> bool:
         # JWA: why is a position without a pawn valid but a position without a queen not?

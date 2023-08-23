@@ -1,3 +1,5 @@
+import time
+from itertools import combinations, product
 from timeit import default_timer as timer
 
 from basics import *
@@ -5,7 +7,7 @@ from evaluation_functions import evaluate_pawns, PAWNS_WIN_VALUE
 from evaluation_functions import get_ordered_square_list_pawn_destinations_best_first
 from evaluation_functions import get_ordered_square_list_queen_destinations_best_first
 
-USE_ORDERED_LISTS = False
+USE_ORDERED_LISTS = False  # True is still much slower
 
 
 def get_eval_pawns_to_play(position, deep):
@@ -141,43 +143,19 @@ def generate_and_evaluate_all_positions_without_pawns():
     for queen in SQUARES:
         assert not pawns_can_win(Position([], queen))
         # without pawns, the latest move was a capture by the queen so pawns needs to play, so
-        # assert queen_can_win(([], queen)) is not valid
+        # assert pawns_can_win is not valid
 
 
-def generate_and_evaluate_all_positions_with_one_pawn():
-    for pawn in PAWN_SQUARES:
-        for queen in SQUARES:
-            p = Position([pawn], queen)
-            if p.is_valid_pawns_to_play():
-                pawns_can_win(p)
-            if p.is_valid_queen_to_play():
-                queen_can_win(p)
-
-
-def generate_and_evaluate_all_positions_with_two_pawns():
-    for pawn1 in PAWN_SQUARES:
-        for pawn2 in PAWN_SQUARES:
-            if SQUARE_TO_FILE[pawn1] < SQUARE_TO_FILE[pawn2]:
-                for queen in SQUARES:
-                    p = Position([pawn1, pawn2], queen)
-                    if p.is_valid_pawns_to_play():
-                        pawns_can_win(p)
-                    if p.is_valid_queen_to_play():
-                        queen_can_win(p)
-
-
-def generate_and_evaluate_all_positions_with_three_pawns():
-    for pawn1 in PAWN_SQUARES:
-        for pawn2 in PAWN_SQUARES:
-            if SQUARE_TO_FILE[pawn1] < SQUARE_TO_FILE[pawn2]:
-                for pawn3 in PAWN_SQUARES:
-                    if SQUARE_TO_FILE[pawn2] < SQUARE_TO_FILE[pawn3]:
-                        for queen in SQUARES:
-                            p = Position([pawn1, pawn2, pawn3], queen)
-                            if p.is_valid_pawns_to_play():
-                                pawns_can_win(p)
-                            if p.is_valid_queen_to_play():
-                                queen_can_win(p)
+def generate_and_evaluate_all_positions_with_fixed_number_of_pawns(nb_pawns):
+    for files in combinations(FILES, nb_pawns):
+        for ranks in product(PAWN_RANKS, repeat=nb_pawns):
+            pawns = [FILE_RANK_TO_SQUARE[file][rank] for file, rank in zip(files, ranks)]
+            for queen in SQUARES:
+                p = Position(pawns, queen)
+                if p.is_valid_pawns_to_play():
+                    pawns_can_win(p)
+                if p.is_valid_queen_to_play():
+                    queen_can_win(p)
 
 
 def print_stats():
@@ -191,7 +169,7 @@ def generate_and_evaluate():
     generate_and_evaluate_all_positions_without_pawns()
     print_stats()
     assert len(dict_pawns_can_win.store[0]) == 64, len(dict_pawns_can_win.store[0])
-    generate_and_evaluate_all_positions_with_one_pawn()
+    generate_and_evaluate_all_positions_with_fixed_number_of_pawns(1)
     print_stats()
     # pawns to play:
     #  6 + 6 rook pawns each with 62 queen positions
@@ -203,10 +181,10 @@ def generate_and_evaluate():
     # no pawns: 64
     assert len(dict_queen_can_win.store[1]) == 8 * 6 * 63
     print_stats()
-    generate_and_evaluate_all_positions_with_two_pawns()
+    generate_and_evaluate_all_positions_with_fixed_number_of_pawns(2)
     print_stats()
-    # generate_and_evaluate_all_positions_with_three_pawns()
-    # evaluation_store.print_stats()
+    generate_and_evaluate_all_positions_with_fixed_number_of_pawns(3)
+    print_stats()
 
 
 def unit_test():
@@ -253,10 +231,13 @@ def main():
 
 
 start = timer()
+start_cpu = time.process_time()
 dict_pawns_can_win = EvaluationStore()
 dict_queen_can_win = EvaluationStore()
 # unit_test()
 generate_and_evaluate()
 end = timer()
+end_cpu = time.process_time()
 print(end - start)
+print(end_cpu - start_cpu)
 # main()

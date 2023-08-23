@@ -1,12 +1,13 @@
 from basics import *
 
 
-RANK_VALUE = [0, 0, 1, 4, 9, 16, 25, 36, 10**10]
+RANK_VALUE = [0, 0, 1, 4, 9, 16, 25, 36, 10 ** 10]
 SQUARE_VALUE = [RANK_VALUE[SQUARE_TO_RANK[sq]] for sq in SQUARES_PLUS_INVALID_SQUARE]
 MULTIPLIER_RANK_VALUE = [4 ** r for r in RANKS_PLUS_INVALID_RANK]
 MULTIPLIER_SQUARE_VALUE = [MULTIPLIER_RANK_VALUE[SQUARE_TO_RANK[sq]] for sq in SQUARES_PLUS_INVALID_SQUARE]
 
 PAWNS_WIN_VALUE = 10 ** 10
+
 
 def evaluate_pawns(pawns: Pawns) -> int:
     if any([IS_PROMOTION_SQUARE[pawn] for pawn in pawns]):
@@ -26,10 +27,10 @@ def evaluate_pawns(pawns: Pawns) -> int:
     return result
 
 
-assert evaluate_pawns(squares('a2b2c2d2e2f2g2h2')) == 72
-assert evaluate_pawns(squares('a3b2c2d2e2f2g2h2')) == 75
-assert evaluate_pawns(squares('a3b2')) == 9
-assert evaluate_pawns(squares('a3c2')) == 7
+assert evaluate_pawns(str_to_squares('a2b2c2d2e2f2g2h2')) == 72
+assert evaluate_pawns(str_to_squares('a3b2c2d2e2f2g2h2')) == 75
+assert evaluate_pawns(str_to_squares('a3b2')) == 9
+assert evaluate_pawns(str_to_squares('a3c2')) == 7
 
 
 def get_int_board_value_for_a_queen(p: Position) -> IntBoard:

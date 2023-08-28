@@ -19,23 +19,22 @@ INVALID_RANK = 0
 RANKS_PLUS_INVALID_RANK = [INVALID_RANK] + RANKS
 RANK_NAME = "x" + "12345678"
 
-SQUARES_AS_PAIRS = [(f, r) for r in reversed(RANKS) for f in FILES]
-# so we start with a8, b8, ..., h8, then a7, b7, ..., h7, etc.
-assert len(SQUARES_AS_PAIRS) == 8 * 8
+SQUARES_TO_FILE_AND_RANK = [(0, 0)] + [(f, r) for f in FILES for r in reversed(RANKS)]
+# so we start with xx, a8, a7, ..., a1, then b8, b7, ..., h1, etc.
+assert len(SQUARES_TO_FILE_AND_RANK) == 1 + 8 * 8
+SQUARE_TO_FILE = [pair[0] for pair in SQUARES_TO_FILE_AND_RANK]
+SQUARE_TO_RANK = [pair[1] for pair in SQUARES_TO_FILE_AND_RANK]
 
 SQUARES = list(range(1, 65))
 INVALID_SQUARE = 0
 SQUARES_PLUS_INVALID_SQUARE = [INVALID_SQUARE] + SQUARES
-SQUARE_NAME = ([FILE_NAME[INVALID_FILE] + RANK_NAME[INVALID_RANK]] +
-               [FILE_NAME[pair[0]] + RANK_NAME[pair[1]] for pair in SQUARES_AS_PAIRS])
+SQUARE_NAME = ([FILE_NAME[pair[0]] + RANK_NAME[pair[1]] for pair in SQUARES_TO_FILE_AND_RANK])
 
 assert SQUARE_NAME[1] == "a8"
-assert SQUARE_NAME[2] == "b8"
+assert SQUARE_NAME[2] == "a7"
 assert SQUARE_NAME[64] == "h1"
 assert SQUARE_NAME[INVALID_SQUARE] == "xx"
 
-SQUARE_TO_FILE = [INVALID_FILE] + [pair[0] for pair in SQUARES_AS_PAIRS]
-SQUARE_TO_RANK = [INVALID_RANK] + [pair[1] for pair in SQUARES_AS_PAIRS]
 FILE_RANK_TO_SQUARE = [[next((sq for sq in SQUARES_PLUS_INVALID_SQUARE
                               if SQUARE_TO_FILE[sq] == f and SQUARE_TO_RANK[sq] == r),
                              INVALID_SQUARE)
@@ -63,8 +62,9 @@ assert SQUARE_NAME[FILE_RANK_TO_SQUARE[1][2]] == "a2"
 assert SQUARE_NAME[FILE_RANK_TO_SQUARE[8][8]] == "h8"
 assert FILE_RANK_TO_SQUARE[INVALID_FILE][3] == FILE_RANK_TO_SQUARE[4][INVALID_RANK] == INVALID_SQUARE
 
-PAWN_SQUARES: List[Square] = [sq for sq in SQUARES if 1 < SQUARE_TO_RANK[sq]]
+PAWN_SQUARES: List[Square] = [sq for sq in SQUARES if 1 < SQUARE_TO_RANK[sq] < 8]
 IS_PROMOTION_SQUARE: BoolBoard = [SQUARE_TO_RANK[sq] == 8 for sq in SQUARES_PLUS_INVALID_SQUARE]
+# 8th rank is not a pawn square. It is valid as a destination but the move should never be played.
 
 
 def str_to_square(s: str) -> Square:
@@ -79,8 +79,8 @@ def str_to_squares(s: str) -> List[Square]:
     return sorted(result)
 
 
-assert str_to_square("b2") == 50, str_to_square("b2")
-assert str_to_squares("b2g2a8") == [1, 50, 55], str_to_squares("b2g2a8")
+assert str_to_square("b2") == 15, str_to_square("b2")
+assert str_to_squares("b2g2a8") == [1, 15, 55], str_to_squares("b2g2a8")
 assert str_to_squares("") == []
 
 
@@ -169,6 +169,9 @@ class Position:
     def __str__(self):
         return "".join([SQUARE_NAME[pawn] for pawn in self.pawns]) + "Q" + SQUARE_NAME[self.queen]
 
+    def __repr__(self):
+        return str(self)
+
     def copy(self):
         return Position(self.pawns.copy(), self.queen)
 
@@ -192,19 +195,16 @@ class Position:
             return False
         return True
 
-    def get_position_after_queen_play(self, new_queen_square):
-        new_pawns = self.pawns.copy()
-        if new_queen_square in new_pawns:
-            new_pawns.remove(new_queen_square)
-        return Position(new_pawns, new_queen_square)
+    def play_queen(self, new_queen_square):
+        self.queen = new_queen_square
+        if new_queen_square in self.pawns:
+            self.pawns.remove(new_queen_square)
 
-    def get_position_after_pawn_play(self, new_pawn_square):
-        new_pawns = self.pawns.copy()
-        for i, pawn in enumerate(new_pawns):
+    def play_pawn(self, new_pawn_square):
+        for i, pawn in enumerate(self.pawns):
             if SQUARE_TO_FILE[pawn] == SQUARE_TO_FILE[new_pawn_square]:
-                new_pawns[i] = new_pawn_square
-                return Position(new_pawns, self.queen)
-
+                self.pawns[i] = new_pawn_square
+                return
         assert False, f"Moving pawn not found: {new_pawn_square}, {self.pawns}"
 
     def get_str_board(self) -> StrBoard:
@@ -228,29 +228,33 @@ class Position:
                 board[NEXT_SQUARE[pawn][d]] = True
         return board
 
-    def get_pawn_destinations(self):
+    def get_pawn_destinations_list(self):
+        result = []
         for pawn in self.pawns:
-            result = NEXT_SQUARE[pawn][Direction.N]
-            if result in (INVALID_SQUARE, self.queen):
+            new_destination = NEXT_SQUARE[pawn][Direction.N]
+            if new_destination in (INVALID_SQUARE, self.queen):
                 continue
-            yield result
+            result.append(new_destination)
             if SQUARE_TO_RANK[pawn] == 2:
-                result = NEXT_SQUARE[result][Direction.N]
-                if result == self.queen:
+                new_destination = NEXT_SQUARE[new_destination][Direction.N]
+                if new_destination == self.queen:
                     continue
-                yield result
+                result.append(new_destination)
+        return result
 
-    def get_queen_destinations(self):
+    def get_queen_destinations_list(self):
+        result = []
         occupied_squares = self.get_bool_board_occupied()
         attacked_squares = self.get_bool_board_attacked_by_pawns()
         for d in Direction:
             square = NEXT_SQUARE[self.queen][d]
             while square != INVALID_SQUARE:
                 if not attacked_squares[square]:
-                    yield square
+                    result.append(square)
                 if occupied_squares[square]:
                     break
                 square = NEXT_SQUARE[square][d]
+        return result
 
 
 def initial_position() -> Position:

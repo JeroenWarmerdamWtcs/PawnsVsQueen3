@@ -74,17 +74,18 @@ def get_int_board_value_for_a_queen(p: Position) -> IntBoard:
 
 def get_ordered_square_list_queen_destinations_best_first(position: Position) -> List[Square]:
     board = get_int_board_value_for_a_queen(position)
-    return sorted(position.get_queen_destinations(), key=lambda square: board[square], reverse=True)
+    return list(sorted(position.get_queen_destinations_list(), key=lambda square: board[square], reverse=True))
 
 
 def get_ordered_square_list_pawn_destinations_best_first(position: Position):
     # we try each pawn move. After each pawn move we do the best queen move (from queen perspective).
     # next we evaluate the pawns as they stand after the queen move.
     values = []
-    for new_pawn_square in position.get_pawn_destinations():
+    for new_pawn_square in position.get_pawn_destinations_list():
         if IS_PROMOTION_SQUARE[new_pawn_square]:
             return [new_pawn_square]
-        next_position = position.get_position_after_pawn_play(new_pawn_square)
+        next_position = position.copy()
+        next_position.play_pawn(new_pawn_square)
         # check if queen can capture
         next_queen_square = get_ordered_square_list_queen_destinations_best_first(next_position)[0]
         next_next_position = next_position.get_position_after_queen_play(next_queen_square)

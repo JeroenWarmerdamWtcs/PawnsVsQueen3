@@ -89,7 +89,7 @@ def get_ordered_square_list_pawn_destinations_best_first(position: Position):
         # check if queen can capture
         next_queen_square = get_ordered_square_list_queen_destinations_best_first(next_position)[0]
         next_next_position = next_position.get_position_after_queen_play(next_queen_square)
-        values.append((evaluate_pawns(next_next_position.pawns), new_pawn_square))
+        values.append((evaluate_pawns(next_next_position.squares), new_pawn_square))
 
     return list(zip(*values))[1] if values else []
     # sorted version? return list(zip(*sorted(values)))[1] if values else []

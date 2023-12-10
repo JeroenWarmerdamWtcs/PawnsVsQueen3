@@ -31,5 +31,5 @@ Number of positions in store: 107495424
   Number of positions with pawns win in 2 moves: 112818
   Number of positions with pawns win in 3 moves: 6928
 Reads: 13332928	Writes: 436356
-time: 58.13s
-cpu time: 54.61s
+time: 54.70s
+cpu time: 53.17s

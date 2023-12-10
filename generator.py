@@ -24,10 +24,6 @@ def generate_pawns_with_rank_below_7_in_fixed_files(files):
         pawns.move(square, S[square])
         index = highest_index
 
-    # for ranks in product([6, 5, 4, 3, 2], repeat=len(files)):
-    #     pawns = [FILE_RANK_TO_SQUARE[file][rank] for file, rank in zip(files, ranks)]
-    #     yield Pawns(pawns)
-
 
 def generate_pawns_with_rank_below_7(nb_pawns):
     for files in combinations(FILES, nb_pawns):

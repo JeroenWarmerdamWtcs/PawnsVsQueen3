@@ -8,7 +8,7 @@ Number of positions in store: 107495424
   Number of positions with pawns win in 1 move: 70
   Number of positions with pawns win in 2 moves: 240
   Number of positions with pawns win in 3 moves: 0
-Reads: 45145	Writes: 2624
+Reads: 48	Writes: 64
 Number of positions in store: 107495424
   Number of unknown position: 107448000
   Number of positions with queen win in 1 move: 104
@@ -19,7 +19,7 @@ Number of positions in store: 107495424
   Number of positions with pawns win in 1 move: 2490
   Number of positions with pawns win in 2 moves: 8110
   Number of positions with pawns win in 3 moves: 390
-Reads: 1096858	Writes: 47424
+Reads: 1980	Writes: 64
 Number of positions in store: 107495424
   Number of unknown position: 107000000
   Number of positions with queen win in 1 move: 104
@@ -30,6 +30,6 @@ Number of positions in store: 107495424
   Number of positions with pawns win in 1 move: 38340
   Number of positions with pawns win in 2 moves: 118242
   Number of positions with pawns win in 3 moves: 9952
-Reads: 13332784	Writes: 495424
-time: 60.06s
-cpu time: 58.39s
+Reads: 32742	Writes: 64
+time: 28.26s
+cpu time: 25.41s

@@ -17,80 +17,82 @@ def get_queen_board_value_white_to_play_pawn_on_rank7(queen_board_value_black_to
     return [0] * len(SQUARES_PLUS_INVALID_SQUARE)
 
 
-def get_queen_origins(position, exclude_squares) -> List[Square]:
+def get_queen_origins_not_attacked(position) -> List[Square]:
     queen_origins = position.get_queen_destinations_list()
     # We turned it around: to what squares can we move from pawn_square.
     # Now we need to check if the queen on such a position is valid IF QUEEN TO PLAY,
+    # jwa klopt niet. Andersom wel: queen kan aangevallen staan.
     # i.e. not attacked by pawns or on top of a pawn.
-    bool_board_attacked_by_pawns = position.get_bool_board_attacked_by_pawns()
-    queen_origins = [sq for sq in queen_origins if
-                     not position.occupy[sq] and
-                     not bool_board_attacked_by_pawns[sq] and
-                     sq not in exclude_squares]
+    assert not any(position.pawns.attack[sq] for sq in queen_origins)
+    queen_origins = [sq for sq in queen_origins if not position.pawns.occupy[sq]]
     return queen_origins
 
 
-def update_queen_can_capture_pawn_on_rank7(lower_pawns, pawn_square,
+def update_queen_can_capture_pawn_on_rank7(pawns, move,
                                            queen_board_value_black_to_play):
-    # update queen_board_value_black_to_play
-    position_after_queen_captures_pawn = Position(Pawns(lower_pawns), queen=pawn_square)
-    if position_after_queen_captures_pawn.is_queen_attacked_by_pawns():
-        return  # queen can not capture pawn
-
-    result_if_queen_captures_pawn = evaluate(position_after_queen_captures_pawn)
-    queen_origins = get_queen_origins(position_after_queen_captures_pawn,
-                                      exclude_squares=
-                                      (NEXT_SQUARE[pawn_square][Direction.W],
-                                       NEXT_SQUARE[pawn_square][Direction.E])
-                                      )
+    # update queen_board_value_black_to_play,
+    # if value after queen captures the pawn is better than the current value
+    # not counting the pawn move and queen move
+    o, d = move  # so SQUARE_TO_RANK[d] == 7
+    if pawns.attack[d]:
+        return  # the queen cannot capture the pawn
+    pawns.remove(o)
+    position_after_queen_captures_pawn = Position(pawns, queen=d)
+    result_if_queen_captures_pawn = repo_pawns_can_win[position_after_queen_captures_pawn]
+    queen_origins = get_queen_origins_not_attacked(position_after_queen_captures_pawn)
+    # note that o, NW[o] and NE[o] are in queen_origins
+    # whereas queen cannot be on o and would be captured on NW[o] or NE[o]
+    # but updating these squares is harmless
     for queen_square in queen_origins:
         queen_board_value_black_to_play[queen_square] = result_if_queen_captures_pawn
+    pawns.add(o)
 
 
-def update_queen_can_blocks_pawn_on_rank_7(lower_pawns, pawn_square, pawns,
+def update_queen_can_blocks_pawn_on_rank_7(pawns, move,
                                            queen_board_value_black_to_play):
-    # update queen_board_value_black_to_play
-    promotion_square = N[pawn_square]
-    position_after_queen_blocks = Position(Pawns(pawns), promotion_square)
-    queen_origins = get_queen_origins(position_after_queen_blocks,
-                                      exclude_squares=(W[pawn_square], E[pawn_square]))
+    # update queen_board_value_black_to_play,
+    # if value after queen blocks the pawn is better than the current value
+    # not counting the pawn move and queen move
+    o, d = move  # so SQUARE_TO_RANK[d] == 7
+    o_was_defended = pawns.attack[o] > 0
+    pawns.move(o, d)
+    position_after_queen_blocks = Position(pawns, N[d])  # queen on rank 8 blocks the pawn on d
 
-    file = SQUARE_TO_FILE[pawn_square]
     result_if_queen_blocks = (
-        DRAW if lower_pawns == [] else
-        PAWNS_WIN_IN_2 if any(pawn for pawn in lower_pawns if SQUARE_TO_RANK[pawn] == 6) else
-        PAWNS_WIN_IN_2 if (file > 1 and FILE_RANK_TO_SQUARE[file - 1][5] in lower_pawns) else
-        PAWNS_WIN_IN_2 if (file < 8 and FILE_RANK_TO_SQUARE[file + 1][5] in lower_pawns) else
+        DRAW if len(pawns.squares) == 1 else
+        PAWNS_WIN_IN_2 if any(pawn for pawn in pawns.squares if SQUARE_TO_RANK[pawn] == 6) else
+        PAWNS_WIN_IN_2 if o_was_defended else
         UNKNOWN)
     if result_if_queen_blocks == UNKNOWN:
         #  White has lower pawns, none on rank 6 and none can defend the pawn on rank 7.
         #  So white does the best pawn move and black will capture the pawn on rank 7 next.
+        #  As we know the queen move, we can improve performance first doing the queen move and next
+        #  try pawn move and evaluate if pawns still need to play.
+        p = position_after_queen_blocks
+        p.play_queen(d)
         result_if_queen_captures_pawn = QUEEN_HAS_WON  # this value will be overwritten
-        p = Position(Pawns(lower_pawns), pawn_square)
         list_of_pawn_moves = p.get_pawn_moves()
-        for o, d in list_of_pawn_moves:
-            p.play_pawn(o, d)
-            # p.play_queen(pawn_square)  we did this move already
+        for o2, d2 in list_of_pawn_moves:
+            p.play_pawn(o2, d2)
             result_if_queen_captures_pawn = max(result_if_queen_captures_pawn,
                                                 repo_pawns_can_win[p])
-            # p.play_back_queen()
             p.play_back_pawn()
-
+        p.play_back_queen()
         result_if_queen_blocks = add_one_move(result_if_queen_captures_pawn)
 
+    pawns.move(d, o)
+    position_with_original_pawns_and_queen_on_promotion_square = Position(pawns, N[d])
+    queen_origins = get_queen_origins_not_attacked(position_with_original_pawns_and_queen_on_promotion_square)
+    # This way, all squares on rank 8 are in queen_origins, except N[d];
+    # this would not be true if we leave the queen on d.
+    # This way d itself is in queen_origins, which is obviously wrong: the o-d move would not be possible.
+    keep_value = queen_board_value_black_to_play[d]
+    # On the diagonals, NW[d] and NE[d] are not in queen_origins.
+    # This is valid, as the pawns would capture the queen instead of moving to d.
     for queen_square in queen_origins:
-        queen_board_value_black_to_play[queen_square] = result_if_queen_blocks
-
-
-def get_queen_board_value_black_to_play_pawn_on_rank7(pawns) -> IntBoard:
-    result = [PAWNS_WIN_IN_1] * len(SQUARES_PLUS_INVALID_SQUARE)
-    pawn_square = get_pawn_on_rank(pawns, 7)
-    lower_pawns = [p for p in pawns if SQUARE_TO_RANK[p] < 7]
-
-    update_queen_can_capture_pawn_on_rank7(lower_pawns, pawn_square, result)
-    update_queen_can_blocks_pawn_on_rank_7(lower_pawns, pawn_square, pawns, result)
-
-    return result
+        queen_board_value_black_to_play[queen_square] = min(result_if_queen_blocks,
+                                                            queen_board_value_black_to_play[queen_square])
+    queen_board_value_black_to_play[d] = keep_value
 
 
 def get_queen_board_value_white_to_play(pawns) -> IntBoard:
@@ -101,22 +103,6 @@ def get_queen_board_value_white_to_play(pawns) -> IntBoard:
     return result
 
 
-def get_queen_board_value(pawns) -> IntBoard:
-    #  for each square, we want the evaluation of the position
-    #  when the queen is on that square, and it is white to play
-    # if pawn on rank 7 or 8
-    if any(SQUARE_TO_RANK[pawn] > 6 for pawn in pawns):
-        return get_queen_board_value_white_to_play_pawn_on_rank7()
-
-    #  for each square, we want the evaluation of the position
-    #  when the has to move from that square
-    result = [0] * len(SQUARES_PLUS_INVALID_SQUARE)
-    for queen in SQUARES:
-        if queen not in pawns:
-            result[queen] = evaluate_pawns(pawns, queen)
-    return result
-
-
 def evaluate(position):
     #    if str(position) == "a5b5f3Qh5":
     if str(position) == "a2Qc3":
@@ -124,6 +110,8 @@ def evaluate(position):
 
     # white to play, at least one pawn, no pawn on rank 7 or 8
     # list_of_pawn_destinations = get_ordered_square_list_pawn_destinations_best_first(position)
+    if position.is_queen_attacked_by_pawns():
+        return PAWNS_WIN_IN_1
     list_of_pawn_moves = position.get_pawn_moves()
 
     if len(list_of_pawn_moves) == 0:

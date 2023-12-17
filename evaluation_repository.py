@@ -17,6 +17,12 @@ class EvaluationRepository:
         self.read_count += 1
         return self.store[position.idx]
 
+    def get_eval_board(self, pawns):
+        return self.store[pawns.idx-1:pawns.idx + 64]
+
+    def save_eval_board(self, pawns, eval_board):
+        self.store[pawns.idx:pawns.idx + 64] = eval_board[1:]
+
     def print_stats(self):
         print(f"Number of positions in store: {len(self.store)}")
         print(f"  Number of unknown position: {self.store.count(UNKNOWN)}")

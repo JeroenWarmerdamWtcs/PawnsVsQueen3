@@ -17,13 +17,21 @@ def set_evaluation_all_positions_without_pawns_to_queen_has_won():
 def generate_and_evaluate_all_positions_with_fixed_number_of_pawns(nb_pawns):
     for pawns in generate_pawns_with_rank_below_7(nb_pawns):
         for queen in SQUARES:
-            if not (pawns.occupy[queen] or pawns.attack[queen]):
+            p = Position(pawns, queen)
+            if pawns.occupy[queen]:
+                pawns_copy = Pawns(pawns.squares[:])
+                pawns_copy.remove(queen)
+                p_corrected = Position(pawns_copy, queen)
+                repo_pawns_can_win.save(p, repo_pawns_can_win[p_corrected])
+            else:
                 p = Position(pawns, queen)
                 repo_pawns_can_win.save(p, evaluate(p))
                 # print(p, evaluate(p), end=" ")
                 # print(repo_pawns_can_win[p])
                 assert p.pawns == pawns
                 assert p.queen == queen
+            # assert repo_pawns_can_win[p] == eval_board[queen], \
+            #     f"{p}: {value_to_str(repo_pawns_can_win[p])} != {value_to_str(eval_board[queen])}"
 
 
 def generate_and_evaluate():
@@ -33,7 +41,8 @@ def generate_and_evaluate():
     # noinspection SpellCheckingInspection
     assert repo_pawns_can_win.store.count(DRAW) == len([2, 3, 4, 5, 6]) * len("abcdefgh") + \
            len("ah") * 12 + len("bcdefg") * 10
-    assert repo_pawns_can_win.store.count(QUEEN_HAS_WON) == 64
+    assert repo_pawns_can_win.store.count(QUEEN_HAS_WON) == 64 + 5 * 8
+    # 5 * 8 positions with the queen on top of the pawn
     assert repo_pawns_can_win.store.count(QUEEN_WINS_IN_1) == 726
     assert repo_pawns_can_win.store.count(QUEEN_WINS_IN_2) == 1360
     assert repo_pawns_can_win.store.count(PAWNS_WIN_IN_2) == 240

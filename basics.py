@@ -189,6 +189,16 @@ class Pawns:
         self.attack[NE[d]] += 1
         self.idx += PAWN_FACTOR[d] - PAWN_FACTOR[o]
 
+    def get_moves(self):
+        result = []
+        for pawn in self.squares:
+            destination = N[pawn]
+            result.append((pawn, destination))
+            if SQUARE_TO_RANK[pawn] == 2:
+                destination = N[destination]
+                result.append((pawn, destination))
+        return result
+
 
 class Position:
     def __init__(self, pawns: Pawns, queen: Square):
@@ -249,18 +259,8 @@ class Position:
         return self.is_square_attacked_by_pawns(self.queen)
 
     def get_pawn_moves(self):
-        result = []
-        for pawn in self.pawns.squares:
-            destination = N[pawn]
-            if destination == self.queen:
-                continue
-            result.append((pawn, destination))
-            if SQUARE_TO_RANK[pawn] == 2:
-                destination = N[destination]
-                if destination == self.queen:
-                    continue
-                result.append((pawn, destination))
-        return result
+        return [(o, d) for (o, d) in self.pawns.get_moves() if self.queen not in (d, N[o])]
+        # Often d == N[o], but not in cases like e2e4.
 
     def get_queen_destinations(self):
         # excluding attacks by pawns
@@ -286,6 +286,14 @@ class Position:
 
     def get_queen_destinations_list(self):
         return list(self.get_queen_destinations())
+
+    # Not used
+    def get_queen_origins(self):
+        for d in NEXT_SQUARE.values():
+            for square in _squares_in_direction(self.queen, d):
+                if self.pawns.occupy[square]:
+                    break
+                yield square
 
 
 def initial_position() -> Position:

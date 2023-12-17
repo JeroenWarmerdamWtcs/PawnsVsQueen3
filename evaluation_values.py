@@ -4,9 +4,10 @@ QUEEN_WINS_IN_1 = 2
 QUEEN_WINS_IN_2 = 3
 QUEEN_WINS_IN_3 = 4
 DRAW = 128
-PAWNS_WIN_IN_1 = 255
-PAWNS_WIN_IN_2 = 254
-PAWNS_WIN_IN_3 = 253
+PAWNS_HAVE_WON = 255
+PAWNS_WIN_IN_1 = 254
+PAWNS_WIN_IN_2 = 253
+PAWNS_WIN_IN_3 = 252
 
 
 def value_to_str(outcome):
@@ -15,9 +16,13 @@ def value_to_str(outcome):
     if outcome == DRAW:
         return " = "
     if outcome < DRAW:
-        return str(1 - outcome)
+        # queen has won
+        if outcome == QUEEN_HAS_WON:
+            return "-0"
+        else:
+            return str(QUEEN_HAS_WON - outcome)
     else:
-        return '+' + str(256 - outcome)
+        return '+' + str(PAWNS_HAVE_WON - outcome)
 
 
 def add_one_move(value):

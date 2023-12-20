@@ -1,7 +1,7 @@
 import time
-from timeit import default_timer as timer
+from timeit import default_timer as timer, timeit
 
-from evaluation import evaluate, update_queen_can_capture_pawn_on_rank7, update_queen_can_blocks_pawn_on_rank_7
+from evaluation import update_queen_can_capture_pawn_on_rank7, update_queen_can_blocks_pawn_on_rank_7
 from evaluation_repository import *
 from generator import generate_pawns_with_rank_below_7
 
@@ -26,6 +26,14 @@ def get_eval_board_pawn_on_rank7(pawns, move) -> bytearray:
 
 def update_queen_board_along_ray(ray, pawns, queen_board_values_white_to_play, queen_board_value_black_to_play):
     # updates queen_board_values_black_to_play
+
+    # print(pawns, end="\t")
+    # for i, sq in enumerate(ray):
+    #     print(f"{'*' if pawns.occupy[sq] else ''}{value_to_str(queen_board_values_white_to_play[sq])}", end=" ")
+    # print("\t", end="")
+    # for i, sq in enumerate(ray):
+    #     print(f"{'*' if pawns.occupy[sq] else ''}{value_to_str(queen_board_value_black_to_play[sq])}", end=" ")
+
     best_value = PAWNS_WIN_IN_1
     index_best_value = 0
     second_value = PAWNS_WIN_IN_1
@@ -43,7 +51,9 @@ def update_queen_board_along_ray(ray, pawns, queen_board_values_white_to_play, q
             for index_write in range(index_write, i):
                 value = best_value if index_write != index_best_value else second_value
                 sq = ray[index_write]
-                queen_board_value_black_to_play[sq] = min(queen_board_value_black_to_play[sq], value)
+                if value < queen_board_value_black_to_play[sq]:
+                    queen_board_value_black_to_play[sq] = value
+                # queen_board_value_black_to_play[sq] = min(queen_board_value_black_to_play[sq], value)
             index_write = i + 1
             best_value = value_i
             index_best_value = i  # that is a bit strange as we might set this value
@@ -52,10 +62,19 @@ def update_queen_board_along_ray(ray, pawns, queen_board_values_white_to_play, q
     for index_write in range(index_write, len(ray)):
         value = best_value if index_write != index_best_value else second_value
         sq = ray[index_write]
-        queen_board_value_black_to_play[sq] = min(queen_board_value_black_to_play[sq], value)
+        if value < queen_board_value_black_to_play[sq]:
+            queen_board_value_black_to_play[sq] = value
+        # queen_board_value_black_to_play[sq] = min(queen_board_value_black_to_play[sq], value)
+
+    # print("\t", end="")
+    # for i, sq in enumerate(ray):
+    #     print(f"{'*' if pawns.occupy[sq] else ''}{value_to_str(queen_board_value_black_to_play[sq])}", end=" ")
+    # print()
 
 
 def get_eval_board_pawns_below_rank7(pawns) -> bytearray:
+    if str(pawns) == "b2d6":
+        jwa = 5
     result = bytearray([PAWNS_HAVE_WON] * len(SQUARES_PLUS_INVALID_SQUARE))
     eval_after_queen_move = repo_pawns_can_win.get_eval_board(pawns)
     for ray in RAYS:
@@ -89,7 +108,9 @@ def generate_and_evaluate_all_positions_with_fixed_number_of_pawns(nb_pawns):
                 for o, d in pawns.get_moves():
                     if d != queen and N[o] != queen:
                         move_found = True
-                        eval_board[queen] = max(eval_board[queen], next_evaluation[(o, d)][queen])
+                        value = next_evaluation[(o, d)][queen]
+                        if value > eval_board[queen]:
+                            eval_board[queen] = value
                 if move_found:
                     eval_board[queen] = add_one_move(eval_board[queen])
                 else:
@@ -97,24 +118,6 @@ def generate_and_evaluate_all_positions_with_fixed_number_of_pawns(nb_pawns):
 
         repo_pawns_can_win.save_eval_board(pawns, eval_board)
 #         print_board(pawns, [value_to_str(v) for v in eval_board])
-        continue
-
-        for queen in SQUARES:
-            p = Position(pawns, queen)
-            if pawns.occupy[queen]:
-                pawns_copy = Pawns(pawns.squares[:])
-                pawns_copy.remove(queen)
-                p_corrected = Position(pawns_copy, queen)
-                repo_pawns_can_win.save(p, repo_pawns_can_win[p_corrected])
-            else:
-                p = Position(pawns, queen)
-                repo_pawns_can_win.save(p, evaluate(p))
-                # print(p, evaluate(p), end=" ")
-                # print(repo_pawns_can_win[p])
-                assert p.pawns == pawns
-                assert p.queen == queen
-            # assert repo_pawns_can_win[p] == eval_board[queen], \
-            #     f"{p}: {value_to_str(repo_pawns_can_win[p])} != {value_to_str(eval_board[queen])}"
 
 
 def generate_and_evaluate():

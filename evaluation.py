@@ -74,8 +74,9 @@ def update_queen_can_blocks_pawn_on_rank_7(pawns, move,
         list_of_pawn_moves = p.get_pawn_moves()
         for o2, d2 in list_of_pawn_moves:
             p.play_pawn(o2, d2)
-            result_if_queen_captures_pawn = max(result_if_queen_captures_pawn,
-                                                repo_pawns_can_win[p])
+            value = repo_pawns_can_win[p]
+            if value > result_if_queen_captures_pawn:
+                result_if_queen_captures_pawn = value
             p.play_back_pawn()
         p.play_back_queen()
         result_if_queen_blocks = add_one_move(result_if_queen_captures_pawn)
@@ -95,104 +96,104 @@ def update_queen_can_blocks_pawn_on_rank_7(pawns, move,
     queen_board_value_black_to_play[d] = keep_value
 
 
-def get_queen_board_value_white_to_play(pawns) -> IntBoard:
-    result = [0] * len(SQUARES_PLUS_INVALID_SQUARE)
-    for queen in SQUARES:
-        if queen not in pawns:
-            result[queen] = evaluate(Position(Pawns(pawns), queen))
-    return result
-
-
-def evaluate(position):
-    #    if str(position) == "a5b5f3Qh5":
-    if str(position) == "a2Qc3":
-        jwa = 5
-
-    # white to play, at least one pawn, no pawn on rank 7 or 8
-    # list_of_pawn_destinations = get_ordered_square_list_pawn_destinations_best_first(position)
-    if position.is_queen_attacked_by_pawns():
-        return PAWNS_WIN_IN_1
-    list_of_pawn_moves = position.get_pawn_moves()
-
-    if len(list_of_pawn_moves) == 0:
-        return DRAW
-
-    best_value_for_pawns = 0  # worst case for white
-    for o, d in list_of_pawn_moves:
-        position.play_pawn(o, d)
-        if SQUARE_TO_RANK[d] == 7:  # special case, not in repo
-            promotion_square = N[d]
-            if position.can_queen_move_to(d):
-                # This means d is not defended.
-                # The queen can and must capture the pawn on d.
-                position.play_queen(d)
-                best_value_for_pawns = max(best_value_for_pawns, add_one_move(repo_pawns_can_win[position]))
-                position.play_back_queen()
-
-            elif not position.can_queen_move_to(promotion_square):
-                position.play_back_pawn()
-                return PAWNS_WIN_IN_2
-
-            # queen must move to the promotion square
-            elif any(SQUARE_TO_RANK[sq] == 6 for sq in position.pawns.squares):
-                best_value_for_pawns = PAWNS_WIN_IN_3
-                # White will advance another pawn to rank 7 and one of them promotes.
-                # It might be better to advance the other pawn on rank 6, so we so not return yet
-
-            elif position.pawns.attack[o] > 1:
-                position.play_back_pawn()
-                return PAWNS_WIN_IN_3
-                # White will advance the attacking pawn to defend the pawn on d.
-                # The queen must leave the promotion square, so the pawn on d will promote.
-                # No player can do better.
-
-            else:
-                # The queen must block and then capture that pawn on file7.
-                position.play_queen(promotion_square)
-
-                # list_of_second_pawn_destinations = get_ordered_square_list_pawn_destinations_best_first(new_position)
-                list_of_second_pawn_moves = position.get_pawn_moves()
-
-                if len(list_of_second_pawn_moves) == 0:
-                    position.play_back_queen()
-                    position.play_back_pawn()
-                    return DRAW
-
-                for o2, d2 in list_of_second_pawn_moves:
-                    position.play_pawn(o2, d2)
-                    position.play_queen(d)  # obligatory and possible
-                    best_value_for_pawns = max(best_value_for_pawns,
-                                               add_two_moves(repo_pawns_can_win[position]))
-                    position.play_back_queen()
-                    position.play_back_pawn()
-
-                position.play_back_queen()
-
-        elif best_value_for_pawns < PAWNS_WIN_IN_3:
-            if str(position) == "a5b5f3Qh5x":
-                for rank in reversed(RANKS):
-                    for file in FILES:
-                        new_queen = FILE_RANK_TO_SQUARE[file][rank]
-                        new_pawns = position.squares.copy()
-                        if new_queen in position.squares:
-                            new_pawns.remove(new_queen)
-                        new_position = Position(Pawns(new_pawns), new_queen)
-                        print(f"{value_to_str(repo_pawns_can_win[new_position]):3}", end=" ")
-                    print()
-
-                input()
-            best_for_queen = PAWNS_WIN_IN_1
-            # list_of_queen_destinations = get_ordered_square_list_queen_destinations_best_first(new_position)
-            list_of_queen_destinations = position.get_queen_destinations_list()
-            for new_queen_square in list_of_queen_destinations:
-                position.play_queen(new_queen_square)
-
-                best_for_queen = min(best_for_queen, add_one_move(repo_pawns_can_win[position]))
-                position.play_back_queen()
-                if best_value_for_pawns >= best_for_queen:
-                    break
-            best_value_for_pawns = max(best_value_for_pawns, best_for_queen)
-
-        position.play_back_pawn()
-
-    return best_value_for_pawns
+# def get_queen_board_value_white_to_play(pawns) -> IntBoard:
+#     result = [0] * len(SQUARES_PLUS_INVALID_SQUARE)
+#     for queen in SQUARES:
+#         if queen not in pawns:
+#             result[queen] = evaluate(Position(Pawns(pawns), queen))
+#     return result
+#
+#
+# def evaluate(position):
+#     #    if str(position) == "a5b5f3Qh5":
+#     if str(position) == "a2Qc3":
+#         jwa = 5
+#
+#     # white to play, at least one pawn, no pawn on rank 7 or 8
+#     # list_of_pawn_destinations = get_ordered_square_list_pawn_destinations_best_first(position)
+#     if position.is_queen_attacked_by_pawns():
+#         return PAWNS_WIN_IN_1
+#     list_of_pawn_moves = position.get_pawn_moves()
+#
+#     if len(list_of_pawn_moves) == 0:
+#         return DRAW
+#
+#     best_value_for_pawns = 0  # worst case for white
+#     for o, d in list_of_pawn_moves:
+#         position.play_pawn(o, d)
+#         if SQUARE_TO_RANK[d] == 7:  # special case, not in repo
+#             promotion_square = N[d]
+#             if position.can_queen_move_to(d):
+#                 # This means d is not defended.
+#                 # The queen can and must capture the pawn on d.
+#                 position.play_queen(d)
+#                 best_value_for_pawns = max(best_value_for_pawns, add_one_move(repo_pawns_can_win[position]))
+#                 position.play_back_queen()
+#
+#             elif not position.can_queen_move_to(promotion_square):
+#                 position.play_back_pawn()
+#                 return PAWNS_WIN_IN_2
+#
+#             # queen must move to the promotion square
+#             elif any(SQUARE_TO_RANK[sq] == 6 for sq in position.pawns.squares):
+#                 best_value_for_pawns = PAWNS_WIN_IN_3
+#                 # White will advance another pawn to rank 7 and one of them promotes.
+#                 # It might be better to advance the other pawn on rank 6, so we so not return yet
+#
+#             elif position.pawns.attack[o] > 1:
+#                 position.play_back_pawn()
+#                 return PAWNS_WIN_IN_3
+#                 # White will advance the attacking pawn to defend the pawn on d.
+#                 # The queen must leave the promotion square, so the pawn on d will promote.
+#                 # No player can do better.
+#
+#             else:
+#                 # The queen must block and then capture that pawn on file7.
+#                 position.play_queen(promotion_square)
+#
+#                 # list_of_second_pawn_destinations = get_ordered_square_list_pawn_destinations_best_first(new_position)
+#                 list_of_second_pawn_moves = position.get_pawn_moves()
+#
+#                 if len(list_of_second_pawn_moves) == 0:
+#                     position.play_back_queen()
+#                     position.play_back_pawn()
+#                     return DRAW
+#
+#                 for o2, d2 in list_of_second_pawn_moves:
+#                     position.play_pawn(o2, d2)
+#                     position.play_queen(d)  # obligatory and possible
+#                     best_value_for_pawns = max(best_value_for_pawns,
+#                                                add_two_moves(repo_pawns_can_win[position]))
+#                     position.play_back_queen()
+#                     position.play_back_pawn()
+#
+#                 position.play_back_queen()
+#
+#         elif best_value_for_pawns < PAWNS_WIN_IN_3:
+#             if str(position) == "a5b5f3Qh5x":
+#                 for rank in reversed(RANKS):
+#                     for file in FILES:
+#                         new_queen = FILE_RANK_TO_SQUARE[file][rank]
+#                         new_pawns = position.squares.copy()
+#                         if new_queen in position.squares:
+#                             new_pawns.remove(new_queen)
+#                         new_position = Position(Pawns(new_pawns), new_queen)
+#                         print(f"{value_to_str(repo_pawns_can_win[new_position]):3}", end=" ")
+#                     print()
+#
+#                 input()
+#             best_for_queen = PAWNS_WIN_IN_1
+#             # list_of_queen_destinations = get_ordered_square_list_queen_destinations_best_first(new_position)
+#             list_of_queen_destinations = position.get_queen_destinations_list()
+#             for new_queen_square in list_of_queen_destinations:
+#                 position.play_queen(new_queen_square)
+#
+#                 best_for_queen = min(best_for_queen, add_one_move(repo_pawns_can_win[position]))
+#                 position.play_back_queen()
+#                 if best_value_for_pawns >= best_for_queen:
+#                     break
+#             best_value_for_pawns = max(best_value_for_pawns, best_for_queen)
+#
+#         position.play_back_pawn()
+#
+#     return best_value_for_pawns

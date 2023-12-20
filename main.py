@@ -53,7 +53,6 @@ def update_queen_board_along_ray(ray, pawns, queen_board_values_white_to_play, q
                 sq = ray[index_write]
                 if value < queen_board_value_black_to_play[sq]:
                     queen_board_value_black_to_play[sq] = value
-                # queen_board_value_black_to_play[sq] = min(queen_board_value_black_to_play[sq], value)
             index_write = i + 1
             best_value = value_i
             index_best_value = i  # that is a bit strange as we might set this value
@@ -82,42 +81,45 @@ def get_eval_board_pawns_below_rank7(pawns) -> bytearray:
     return result
 
 
-def generate_and_evaluate_all_positions_with_fixed_number_of_pawns(nb_pawns):
+def evaluate_pawns(pawns):
     next_evaluation = {}
+    for o, d in pawns.get_moves():
+        if SQUARE_TO_RANK[d] == 7:
+            next_evaluation[(o, d)] = get_eval_board_pawn_on_rank7(pawns, (o, d))
+            # print_board(f"{pawns}, {d}", [value_to_str(v) for v in next_evaluation[(o, d)]])
+        else:
+            pawns.move(o, d)
+            next_evaluation[(o, d)] = get_eval_board_pawns_below_rank7(pawns)
+            # print_board(f"{pawns}, {d}", [value_to_str(v) for v in next_evaluation[(o, d)]])
+            pawns.move(d, o)
+
+    eval_board = bytearray([QUEEN_HAS_WON] * len(SQUARES_PLUS_INVALID_SQUARE))
+    for queen in SQUARES:
+        if pawns.occupy[queen]:
+            pawns.remove(queen)
+            eval_board[queen] = repo_pawns_can_win[Position(pawns, queen)]
+            pawns.add(queen)
+        elif pawns.attack[queen]:
+            eval_board[queen] = PAWNS_WIN_IN_1
+        else:
+            move_found = False
+            for o, d in pawns.get_moves():
+                if d != queen and N[o] != queen:
+                    move_found = True
+                    value = next_evaluation[(o, d)][queen]
+                    if value > eval_board[queen]:
+                        eval_board[queen] = value
+            if move_found:
+                eval_board[queen] = add_one_move(eval_board[queen])
+            else:
+                eval_board[queen] = DRAW
+
+    repo_pawns_can_win.save_eval_board(pawns, eval_board)
+
+
+def generate_and_evaluate_all_positions_with_fixed_number_of_pawns(nb_pawns):
     for pawns in generate_pawns_with_rank_below_7(nb_pawns):
-        for o, d in pawns.get_moves():
-            if SQUARE_TO_RANK[d] == 7:
-                next_evaluation[(o, d)] = get_eval_board_pawn_on_rank7(pawns, (o, d))
-                # print_board(f"{pawns}, {d}", [value_to_str(v) for v in next_evaluation[(o, d)]])
-            else:
-                pawns.move(o, d)
-                next_evaluation[(o, d)] = get_eval_board_pawns_below_rank7(pawns)
-                # print_board(f"{pawns}, {d}", [value_to_str(v) for v in next_evaluation[(o, d)]])
-                pawns.move(d, o)
-
-        eval_board = bytearray([QUEEN_HAS_WON] * len(SQUARES_PLUS_INVALID_SQUARE))
-        for queen in SQUARES:
-            if pawns.occupy[queen]:
-                pawns.remove(queen)
-                eval_board[queen] = repo_pawns_can_win[Position(pawns, queen)]
-                pawns.add(queen)
-            elif pawns.attack[queen]:
-                eval_board[queen] = PAWNS_WIN_IN_1
-            else:
-                move_found = False
-                for o, d in pawns.get_moves():
-                    if d != queen and N[o] != queen:
-                        move_found = True
-                        value = next_evaluation[(o, d)][queen]
-                        if value > eval_board[queen]:
-                            eval_board[queen] = value
-                if move_found:
-                    eval_board[queen] = add_one_move(eval_board[queen])
-                else:
-                    eval_board[queen] = DRAW
-
-        repo_pawns_can_win.save_eval_board(pawns, eval_board)
-#         print_board(pawns, [value_to_str(v) for v in eval_board])
+        evaluate_pawns(pawns)
 
 
 def generate_and_evaluate():

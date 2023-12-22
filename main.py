@@ -1,26 +1,27 @@
 import time
-from timeit import default_timer as timer, timeit
+from timeit import default_timer as timer
 
-from evaluation import update_queen_can_capture_pawn_on_rank7, update_queen_can_blocks_pawn_on_rank_7
+from evaluation import update_if_queen_can_capture_pawn_on_rank7, update_if_queen_can_blocks_pawn_on_rank_7
 from evaluation_repository import *
 from generator import generate_pawns_with_rank_below_7
-
-import sys
-sys.stdout = open('output.txt', mode='w')
 
 
 def set_evaluation_all_positions_without_pawns_to_queen_has_won():
     for queen in SQUARES:
-        repo_pawns_can_win.save(Position(Pawns([]), queen), QUEEN_HAS_WON)
+        repo_pawns_can_win.store(Position(Pawns([]), queen), QUEEN_HAS_WON)
 
 
 def get_eval_board_pawn_on_rank7(pawns, move) -> bytearray:
-    # returns the evaluation of the position after the move,
-    # the pawn move and the queen move are not included
+    # Returns the evaluation of the position after the move.
+    # The pawn move and the queen move are not counted in the values.
+    # The returned values for occupied or attacked squares are not used.
     result = bytearray([PAWNS_WIN_IN_1] * len(SQUARES_PLUS_INVALID_SQUARE))
-    # if the queen cannot capture the pawn nor block, then the pawn will promote next move
-    update_queen_can_capture_pawn_on_rank7(pawns, move, result)
-    update_queen_can_blocks_pawn_on_rank_7(pawns, move, result)
+    # If the queen cannot capture the pawn nor block, then the pawn will promote next move
+    update_if_queen_can_blocks_pawn_on_rank_7(pawns, move, result)
+    update_if_queen_can_capture_pawn_on_rank7(pawns, move, result)
+    # If the queen can both capture and block the pawn on rank 7,
+    # then the queen must be on rank 7 as well next to the pawn.
+    # So that queen square was attacked and the return value will not be used.
     return result
 
 
@@ -72,8 +73,6 @@ def update_queen_board_along_ray(ray, pawns, queen_board_values_white_to_play, q
 
 
 def get_eval_board_pawns_below_rank7(pawns) -> bytearray:
-    if str(pawns) == "b2d6":
-        jwa = 5
     result = bytearray([PAWNS_HAVE_WON] * len(SQUARES_PLUS_INVALID_SQUARE))
     eval_after_queen_move = repo_pawns_can_win.get_eval_board(pawns)
     for ray in RAYS:
@@ -114,7 +113,7 @@ def evaluate_pawns(pawns):
             else:
                 eval_board[queen] = DRAW
 
-    repo_pawns_can_win.save_eval_board(pawns, eval_board)
+    repo_pawns_can_win.store_eval_board(pawns, eval_board)
 
 
 def generate_and_evaluate_all_positions_with_fixed_number_of_pawns(nb_pawns):
@@ -124,44 +123,21 @@ def generate_and_evaluate_all_positions_with_fixed_number_of_pawns(nb_pawns):
 
 def generate_and_evaluate():
     set_evaluation_all_positions_without_pawns_to_queen_has_won()
-    generate_and_evaluate_all_positions_with_fixed_number_of_pawns(1)
-    print_repo_stats()
-    # noinspection SpellCheckingInspection
-    assert repo_pawns_can_win.store.count(DRAW) == len([2, 3, 4, 5, 6]) * len("abcdefgh") + \
-           len("ah") * 12 + len("bcdefg") * 10
-    assert repo_pawns_can_win.store.count(QUEEN_HAS_WON) == 64 + 5 * 8
-    # 5 * 8 positions with the queen on top of the pawn
-    assert repo_pawns_can_win.store.count(QUEEN_WINS_IN_1) == 726
-    assert repo_pawns_can_win.store.count(QUEEN_WINS_IN_2) == 1360
-    assert repo_pawns_can_win.store.count(PAWNS_WIN_IN_2) == 240
-
-    generate_and_evaluate_all_positions_with_fixed_number_of_pawns(2)
-    print_repo_stats()
-    generate_and_evaluate_all_positions_with_fixed_number_of_pawns(3)
-    print_repo_stats()
-    # cpu time 66.09s
-    # cpu time 57.62s
+    for nb_pawns in range(1, 9):
+        print(nb_pawns)
+        generate_and_evaluate_all_positions_with_fixed_number_of_pawns(nb_pawns)
 
 
 start = timer()
 start_cpu = time.process_time()
-# unit_test()
 generate_and_evaluate()
+print("saving")
+repo_pawns_can_win.save_to_file("repo_pawns_can_win2.bin")
+# repo_pawns_can_win.load_from_file("repo_pawns_can_win.bin")
+print_repo_stats()
+print(f"{initial_position()}: {value_to_str(repo_pawns_can_win[initial_position()])}")
+
 end = timer()
 end_cpu = time.process_time()
 print(f"time: {end - start:.2f}s")
 print(f"cpu time: {end_cpu - start_cpu:.2f}s")
-
-
-def print_stats_pawns_below_rank_7_play_and_lose():
-    for n in range(9):
-        if len(repo_pawns_can_win.store[n]) > 0 and n == 3:  # jwa
-            count = {}
-            for code, evaluation in repo_pawns_can_win.store[n].items():
-                pawns = list(code[:-1])
-                pawns.sort(key=SQUARE_TO_FILE.__getitem__)
-                files = tuple(SQUARE_TO_FILE[pawn] for pawn in pawns)
-                if all(SQUARE_TO_RANK[pawn] < 7 for pawn in code[:-1]) and not evaluation:
-                    count[files] = count.get(files, 0) + 1
-            for files, count in sorted(count.items(), key=lambda x: x[1]):
-                print(f"{files}: {count}")

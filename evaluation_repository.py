@@ -4,52 +4,64 @@ from evaluation_values import *
 
 class EvaluationRepository:
     def __init__(self):
-        self.store = bytearray(MAX_INDEX + 1)  # will be initialized to UNKNOWN
+        self._store = bytearray(MAX_INDEX + 1)  # will be initialized to 0 = UNKNOWN
         self.read_count = 0
         self.write_count = 0
 
-    def save(self, position, evaluation):
-        self.store[position.idx] = evaluation
+    def store(self, position, evaluation):
+        self._store[position.idx] = evaluation
         self.write_count += 1
 
     def __getitem__(self, position):
-        # code = self.position_to_code(position)
         self.read_count += 1
-        return self.store[position.idx]
+        return self._store[position.idx]
 
     def get_eval_board(self, pawns):
-        return self.store[pawns.idx-1:pawns.idx + 64]
+        # note pawns.idx-1 will be the value when the queen is on square 0 = INVALID_SQUARE
+        return self._store[pawns.idx-1:pawns.idx + 64]
 
-    def save_eval_board(self, pawns, eval_board):
-        self.store[pawns.idx:pawns.idx + 64] = eval_board[1:]
+    def store_eval_board(self, pawns, eval_board):
+        # note eval_board[0] will be the value when the queen is on square 0 = INVALID_SQUARE
+        # so need not be stored
+        self._store[pawns.idx:pawns.idx + 64] = eval_board[1:]
+
+    def save_to_file(self, filename):
+        with open(filename, "wb") as f:
+            f.write(self._store)
+
+    def load_from_file(self, filename):
+        with open(filename, "rb") as f:
+            self._store = bytearray(f.read())
+        assert len(self._store) == MAX_INDEX + 1, len(self._store)
+
+    @property
+    def size(self):
+        return len(self._store)
+
+    def count(self, value):
+        return self._store.count(value)
 
     def print_stats(self):
-        print(f"Number of positions in store: {len(self.store)}")
-        print(f"  Number of unknown position: {self.store.count(UNKNOWN)}")
-        print(f"  Number of positions with queen win in 1 move: {self.store.count(QUEEN_HAS_WON)}")
-        for c, v in enumerate(self.store):
-            if v == PAWNS_WIN_IN_2 and False:
-                print(self.code_to_position(c))
-        print(f"  Number of positions with queen win in 2 moves: {self.store.count(QUEEN_WINS_IN_1)}")
-        print(f"  Number of positions with queen win in 3 moves: {self.store.count(QUEEN_WINS_IN_2)}")
-        print(f"  Number of positions with queen win in 4 moves: {self.store.count(QUEEN_WINS_IN_3)}")
-        print(f"  Number of positions with draw: {self.store.count(DRAW)}")
-        print(f"  Number of positions with pawns win in 1 move: {self.store.count(PAWNS_WIN_IN_1)}")
-        print(f"  Number of positions with pawns win in 2 moves: {self.store.count(PAWNS_WIN_IN_2)}")
-        print(f"  Number of positions with pawns win in 3 moves: {self.store.count(PAWNS_WIN_IN_3)}")
+        print(f"Number of positions in store: {len(self._store)}")
+        print(f"  Number of unknown position: {self._store.count(UNKNOWN)}")
+        print(f"  Number of positions with draw: {self._store.count(DRAW)}")
+        print(f"  Number of positions queen has won: {self._store.count(QUEEN_HAS_WON)}")
+        print(f"  Number of positions with pawns win in 1 move: {self._store.count(PAWNS_WIN_IN_1)}")
+        print(f"  Number of positions with queen win in 1 move: {self._store.count(QUEEN_WINS_IN_1)}")
+        value_pawn_wins = PAWNS_WIN_IN_1
+        value_queen_wins = QUEEN_WINS_IN_1
+        for i in range(2, 40):
+            value_pawn_wins = add_one_move(value_pawn_wins)
+            count = self._store.count(value_pawn_wins)
+            if count > 0:
+                print(f"  Number of positions with pawns win in {i} moves: {count}")
+            value_queen_wins = add_one_move(value_queen_wins)
+            count = self._store.count(value_queen_wins)
+            if count > 0:
+                print(f"  Number of positions with queen win in {i} moves: {count}")
 
     def print_counts(self):
         print(f"Reads: {self.read_count}\tWrites: {self.write_count}")
-
-    @staticmethod
-    def position_to_code(position):
-        result = 0
-        for pawn in position.squares:
-            f, r = SQUARES_TO_FILE_AND_RANK[pawn]
-            assert r < 7, position
-            result += FACTOR[f] * (r - 1)
-        result += position.queen - 1
-        return result
 
     @staticmethod
     def code_to_position(code):
@@ -61,7 +73,7 @@ class EvaluationRepository:
             code //= 6
             if r != 0:
                 pawns.append(FILE_RANK_TO_SQUARE[f][r + 1])
-        return Position(pawns, queen)
+        return Position(Pawns(pawns), queen)
 
 
 def print_repo_stats():
@@ -70,13 +82,3 @@ def print_repo_stats():
 
 
 repo_pawns_can_win = EvaluationRepository()
-
-
-def test():
-    assert EvaluationRepository.position_to_code(EvaluationRepository.code_to_position(64)) == 64
-    for c in range(10000):
-        assert EvaluationRepository.position_to_code(EvaluationRepository.code_to_position(c)) == c, c
-
-
-if __name__ == "__main__":
-    test()

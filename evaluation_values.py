@@ -31,11 +31,3 @@ def add_one_move(value):
     if value < DRAW:
         return value + 1
     return value
-
-
-def add_two_moves(value):
-    if value > DRAW:
-        return value - 2
-    if value < DRAW:
-        return value + 2
-    return value

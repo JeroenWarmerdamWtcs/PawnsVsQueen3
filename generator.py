@@ -1,10 +1,5 @@
-from itertools import product, combinations
+from itertools import combinations
 from basics import *
-
-
-def generate_all_positions_without_pawns():
-    for queen in SQUARES:
-        yield Position(Pawns([]), queen)
 
 
 def generate_pawns_with_rank_below_7_in_fixed_files(files):
